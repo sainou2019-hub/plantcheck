@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlantCheck - 作物生育記録</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Growth Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center text-white text-xl shadow-md shadow-brand-500/20">
+                        <i class="fa-solid font-bold fa-seedling"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold text-slate-900 tracking-tight">PlantCheck</span>
+                        <span class="hidden sm:inline-block text-xs bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full ml-2 font-medium">生育記録</span>
+                    </div>
+                </div>
+
+                <!-- User Profile / Login -->
+                <div id="authContainer" class="flex items-center space-x-3">
+                    <div id="loadingAuth" class="text-sm text-slate-400">
+                        <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> 読み込み中...
+                    </div>
+                    <div id="userInfo" class="hidden flex items-center space-x-3">
+                        <img id="userAvatar" src="" alt="Avatar" class="w-9 h-9 rounded-full ring-2 ring-brand-500/30 object-cover">
+                        <span id="userName" class="text-sm font-semibold text-slate-700 hidden sm:inline"></span>
+                        <button id="logoutBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium transition duration-150">
+                            <i class="fa-solid fa-right-from-bracket sm:mr-1"></i>
+                            <span class="hidden sm:inline">ログアウト</span>
+                        </button>
+                    </div>
+                    <button id="googleLoginBtn" class="hidden bg-slate-900 hover:bg-slate-800 text-white text-sm px-4 py-2 rounded-xl font-medium shadow-sm transition flex items-center space-x-2">
+                        <i class="fa-brands fa-google"></i>
+                        <span>Googleでログイン</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- Unauthenticated View -->
+        <section id="loggedOutView" class="hidden py-12 sm:py-20 text-center">
+            <div class="max-w-xl mx-auto space-y-6">
+                <div class="w-20 h-20 bg-brand-100 text-brand-600 rounded-3xl flex items-center justify-center mx-auto text-4xl shadow-inner">
+                    <i class="fa-solid fa-wheat-awn"></i>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                    作物の成長を、<br><span class="text-brand-600">スマートに記録・可視化</span>
+                </h1>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    PlantCheckは、野菜や植物の植え付けから収穫までの観察日記や成長グラフを簡単に記録できるクラウドアプリケーションです。
+                </p>
+                <div class="pt-4">
+                    <button id="heroLoginBtn" class="bg-brand-600 hover:bg-brand-700 text-white text-base font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-brand-600/30 transition transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center space-x-3 mx-auto">
+                        <i class="fa-brands fa-google text-lg"></i>
+                        <span>Googleアカウントで始める</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Authenticated Dashboard -->
+        <section id="loggedInView" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Sidebar: Crop Selection / Management -->
+                <div class="lg:col-span-4 space-y-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center">
+                            <i class="fa-solid fa-list-check text-brand-600 mr-2"></i>栽培中の作物
+                        </h2>
+                        <button id="openAddCropModalBtn" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition shadow-sm flex items-center space-x-1">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>新規追加</span>
+                        </button>
+                    </div>
+
+                    <!-- Crop List -->
+                    <div id="cropList" class="space-y-3 custom-scrollbar max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+                        <!-- Dynamic Crop Cards insertion -->
+                    </div>
+
+                    <!-- Empty State for Crops -->
+                    <div id="emptyCrops" class="hidden bg-white p-8 rounded-2xl border border-dashed border-slate-300 text-center space-y-3">
+                        <i class="fa-solid fa-leaf text-4xl text-slate-300"></i>
+                        <p class="text-slate-500 font-medium text-sm">登録されている作物がありません。</p>
+                        <p class="text-slate-400 text-xs">「新規追加」ボタンから作物を登録してみましょう！</p>
+                    </div>
+                </div>
+
+                <!-- Main Area: Selected Crop Details, Analytics & Logs -->
+                <div class="lg:col-span-8 space-y-6">
+                    
+                    <!-- Prompt when no crop selected -->
+                    <div id="noCropSelected" class="bg-white rounded-2xl p-12 border border-slate-200/80 shadow-sm text-center text-slate-400 space-y-2">
+                        <i class="fa-solid fa-hand-pointer text-4xl text-slate-300 mb-2"></i>
+                        <p class="font-medium text-base text-slate-600">左側のリストから作物名を選択してください。</p>
+                        <p class="text-xs">生育記録の確認や新しい観察日記の投稿が行えます。</p>
+                    </div>
+
+                    <!-- Detail Section (Hidden by default until selected) -->
+                    <div id="cropDetailArea" class="hidden space-y-6">
+                        
+                        <!-- Selected Crop Header Card -->
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                            <div class="flex flex-wrap justify-between items-start gap-4">
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <span id="detailCategory" class="bg-brand-100 text-brand-800 text-xs px-2.5 py-1 rounded-md font-semibold">野菜</span>
+                                        <h2 id="detailName" class="text-2xl font-extrabold text-slate-900">トマト</h2>
+                                    </div>
+                                    <p id="detailVariety" class="text-slate-500 text-sm mt-1">品種: 桃太郎</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="openAddLogModalBtn" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center space-x-1.5">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                        <span>観察ログを追加</span>
+                                    </button>
+                                    <button id="deleteCropBtn" class="text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-xl transition" title="作物を削除">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100 text-xs sm:text-sm">
+                                <div class="bg-slate-50 p-3 rounded-xl">
+                                    <span class="text-slate-400 block text-xs">植え付け日</span>
+                                    <span id="detailPlantDate" class="font-semibold text-slate-700">2026-04-01</span>
+                                </div>
+                                <div class="bg-slate-50 p-3 rounded-xl">
+                                    <span class="text-slate-400 block text-xs">経過日数</span>
+                                    <span id="detailDaysPassed" class="font-semibold text-brand-600">0 日目</span>
+                                </div>
+                                <div class="bg-slate-50 p-3 rounded-xl col-span-2 sm:col-span-1">
+                                    <span class="text-slate-400 block text-xs">メモ</span>
+                                    <span id="detailNotes" class="font-semibold text-slate-700 truncate block">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Growth Chart Card -->
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                                <i class="fa-solid fa-chart-line text-brand-600 mr-2"></i>成長チャート (草丈・葉の数)
+                            </h3>
+                            <div class="h-64 relative">
+                                <canvas id="growthChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Log History / Timeline -->
+                        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                                <i class="fa-solid fa-clock-rotate-left text-brand-600 mr-2"></i>観察タイムライン
+                            </h3>
+
+                            <div id="logList" class="space-y-4">
+                                <!-- Dynamic Logs insertion -->
+                            </div>
+
+                            <div id="emptyLogs" class="hidden text-center py-8 text-slate-400 text-sm">
+                                観察記録がまだ投稿されていません。「観察ログを追加」ボタンから最初の記録を残しましょう！
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Add / Edit Crop -->
+    <div id="cropModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 transform transition-all">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-900">新しい作物を追加</h3>
+                <button id="closeCropModalBtn" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="cropForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">作物名 <span class="text-red-500">*</span></label>
+                    <input type="text" id="cropName" required placeholder="例: ミニトマト, イチゴ" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">品種</label>
+                    <input type="text" id="cropVariety" placeholder="例: アイコ, アキラ" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">カテゴリー</label>
+                        <select id="cropCategory" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="野菜">野菜</option>
+                            <option value="果物">果物</option>
+                            <option value="花卉・観葉">花卉・観葉</option>
+                            <option value="ハーブ">ハーブ</option>
+                            <option value="穀物">穀物</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">植え付け日 <span class="text-red-500">*</span></label>
+                        <input type="date" id="cropPlantDate" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">メモ・目標</label>
+                    <textarea id="cropNotes" rows="2" placeholder="栽培目標やメモ事項など" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" id="cancelCropModalBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">キャンセル</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition">登録する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Observation Log -->
+    <div id="logModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 transform transition-all custom-scrollbar max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-900">観察ログを追加</h3>
+                <button id="closeLogModalBtn" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="logForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">観察日 <span class="text-red-500">*</span></label>
+                        <input type="date" id="logDate" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">草丈・高さ (cm)</label>
+                        <input type="number" step="0.1" id="logHeight" placeholder="例: 15.5" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">葉の数 (枚)</label>
+                        <input type="number" id="logLeaves" placeholder="例: 6" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">写真URL (任意)</label>
+                        <input type="url" id="logImageUrl" placeholder="https://..." class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">実施したお手入れ</label>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <label class="inline-flex items-center bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100">
+                            <input type="checkbox" name="logAction" value="水やり" class="rounded text-brand-600 focus:ring-brand-500 mr-1.5"> 水やり
+                        </label>
+                        <label class="inline-flex items-center bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100">
+                            <input type="checkbox" name="logAction" value="追肥" class="rounded text-brand-600 focus:ring-brand-500 mr-1.5"> 追肥
+                        </label>
+                        <label class="inline-flex items-center bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100">
+                            <input type="checkbox" name="logAction" value="害虫対策" class="rounded text-brand-600 focus:ring-brand-500 mr-1.5"> 害虫対策
+                        </label>
+                        <label class="inline-flex items-center bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100">
+                            <input type="checkbox" name="logAction" value="脇芽かき・剪定" class="rounded text-brand-600 focus:ring-brand-500 mr-1.5"> 脇芽かき・剪定
+                        </label>
+                        <label class="inline-flex items-center bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100">
+                            <input type="checkbox" name="logAction" value="収穫" class="rounded text-brand-600 focus:ring-brand-500 mr-1.5"> 収穫 🎉
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">観察メモ・所感</label>
+                    <textarea id="logNotes" rows="3" placeholder="葉の色やつぼみの状態、気付きなどを記録" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" id="cancelLogModalBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">キャンセル</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition">記録を保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- Firebase SDK Imports & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getAuth, 
+            GoogleAuthProvider, 
+            signInWithPopup, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            doc, 
+            deleteDoc, 
+            onSnapshot, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBF0vuBihYjQ8BMvKSiwb34u_6YrrqOqko",
+            authDomain: "plantcheck-777cb.firebaseapp.com",
+            projectId: "plantcheck-777cb",
+            storageBucket: "plantcheck-777cb.firebasestorage.app",
+            messagingSenderId: "1073966566007",
+            appId: "1:1073966566007:web:33dcb0f4218a8f42a9d472"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        // Application State
+        let currentUser = null;
+        let crops = [];
+        let selectedCropId = null;
+        let logs = [];
+        let growthChartInstance = null;
+        let unsubscribeCrops = null;
+        let unsubscribeLogs = null;
+
+        // DOM Elements
+        const loadingAuth = document.getElementById('loadingAuth');
+        const userInfo = document.getElementById('userInfo');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const googleLoginBtn = document.getElementById('googleLoginBtn');
+        const heroLoginBtn = document.getElementById('heroLoginBtn');
+        const loggedInView = document.getElementById('loggedInView');
+        const loggedOutView = document.getElementById('loggedOutView');
+        
+        const cropList = document.getElementById('cropList');
+        const emptyCrops = document.getElementById('emptyCrops');
+        const noCropSelected = document.getElementById('noCropSelected');
+        const cropDetailArea = document.getElementById('cropDetailArea');
+        
+        // Detail DOMs
+        const detailCategory = document.getElementById('detailCategory');
+        const detailName = document.getElementById('detailName');
+        const detailVariety = document.getElementById('detailVariety');
+        const detailPlantDate = document.getElementById('detailPlantDate');
+        const detailDaysPassed = document.getElementById('detailDaysPassed');
+        const detailNotes = document.getElementById('detailNotes');
+        const logList = document.getElementById('logList');
+        const emptyLogs = document.getElementById('emptyLogs');
+
+        // Modals
+        const cropModal = document.getElementById('cropModal');
+        const logModal = document.getElementById('logModal');
+        const openAddCropModalBtn = document.getElementById('openAddCropModalBtn');
+        const closeCropModalBtn = document.getElementById('closeCropModalBtn');
+        const cancelCropModalBtn = document.getElementById('cancelCropModalBtn');
+        const cropForm = document.getElementById('cropForm');
+        
+        const openAddLogModalBtn = document.getElementById('openAddLogModalBtn');
+        const closeLogModalBtn = document.getElementById('closeLogModalBtn');
+        const cancelLogModalBtn = document.getElementById('cancelLogModalBtn');
+        const logForm = document.getElementById('logForm');
+        const deleteCropBtn = document.getElementById('deleteCropBtn');
+
+        // Auth Listener
+        onAuthStateChanged(auth, (user) => {
+            loadingAuth.classList.add('hidden');
+            if (user) {
+                currentUser = user;
+                userName.textContent = user.displayName || 'ユーザー';
+                userAvatar.src = user.photoURL || 'https://via.placeholder.com/150';
+                userInfo.classList.remove('hidden');
+                userInfo.classList.add('flex');
+                googleLoginBtn.classList.add('hidden');
+                
+                loggedOutView.classList.add('hidden');
+                loggedInView.classList.remove('hidden');
+
+                // Subscribe to Crops
+                subscribeCrops();
+            } else {
+                currentUser = null;
+                userInfo.classList.add('hidden');
+                googleLoginBtn.classList.remove('hidden');
+                
+                loggedInView.classList.add('hidden');
+                loggedOutView.classList.remove('hidden');
+
+                if (unsubscribeCrops) unsubscribeCrops();
+                if (unsubscribeLogs) unsubscribeLogs();
+            }
+        });
+
+        // Auth Event Handlers
+        const handleLogin = async () => {
+            try {
+                await signInWithPopup(auth, googleProvider);
+                showToast('ログインしました', 'success');
+            } catch (error) {
+                console.error("Login Error:", error);
+                showToast('ログインに失敗しました', 'error');
+            }
+        };
+
+        googleLoginBtn.addEventListener('click', handleLogin);
+        heroLoginBtn.addEventListener('click', handleLogin);
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showToast('ログアウトしました', 'info');
+            } catch (error) {
+                console.error("Logout Error:", error);
+            }
+        });
+
+        // Subscribe to User Crops
+        function subscribeCrops() {
+            if (!currentUser) return;
+            const cropsRef = collection(db, 'users', currentUser.uid, 'crops');
+            
+            unsubscribeCrops = onSnapshot(cropsRef, (snapshot) => {
+                crops = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // Sort by planting date desc in JS
+                crops.sort((a, b) => new Date(b.plantDate) - new Date(a.plantDate));
+
+                renderCropList();
+
+                // Keep selection if exists, else reset
+                if (selectedCropId && crops.some(c => c.id === selectedCropId)) {
+                    selectCrop(selectedCropId);
+                } else if (crops.length > 0) {
+                    selectCrop(crops[0].id);
+                } else {
+                    selectedCropId = null;
+                    renderSelectedCrop();
+                }
+            }, (error) => {
+                console.error("Error fetching crops:", error);
+                showToast("データ読み込みエラーが発生しました", "error");
+            });
+        }
+
+        // Subscribe to Logs of Selected Crop
+        function subscribeLogs(cropId) {
+            if (unsubscribeLogs) unsubscribeLogs();
+            if (!currentUser || !cropId) return;
+
+            const logsRef = collection(db, 'users', currentUser.uid, 'crops', cropId, 'logs');
+            
+            unsubscribeLogs = onSnapshot(logsRef, (snapshot) => {
+                logs = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // Sort logs by date desc in JS
+                logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                renderLogs();
+                updateChart();
+            }, (error) => {
+                console.error("Error fetching logs:", error);
+            });
+        }
+
+        // Render Crops List in Sidebar
+        function renderCropList() {
+            cropList.innerHTML = '';
+            if (crops.length === 0) {
+                emptyCrops.classList.remove('hidden');
+                return;
+            }
+            emptyCrops.classList.add('hidden');
+
+            crops.forEach(crop => {
+                const days = calculateDaysPassed(crop.plantDate);
+                const isSelected = crop.id === selectedCropId;
+                
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl cursor-pointer transition border ${
+                    isSelected 
+                    ? 'bg-brand-50/80 border-brand-500 shadow-sm' 
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`;
+                card.onclick = () => selectCrop(crop.id);
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-brand-700 bg-brand-100 px-2 py-0.5 rounded-md">${escapeHtml(crop.category || '野菜')}</span>
+                            <h3 class="font-bold text-slate-900 text-base mt-1">${escapeHtml(crop.name)}</h3>
+                            <p class="text-xs text-slate-500">${escapeHtml(crop.variety ? '品種: ' + crop.variety : '品種未設定')}</p>
+                        </div>
+                        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
+                            ${days}日目
+                        </span>
+                    </div>
+                `;
+                cropList.appendChild(card);
+            });
+        }
+
+        // Select a Crop
+        function selectCrop(id) {
+            selectedCropId = id;
+            renderCropList();
+            renderSelectedCrop();
+            subscribeLogs(id);
+        }
+
+        // Render Selected Crop Detail Area
+        function renderSelectedCrop() {
+            if (!selectedCropId) {
+                noCropSelected.classList.remove('hidden');
+                cropDetailArea.classList.add('hidden');
+                return;
+            }
+
+            const crop = crops.find(c => c.id === selectedCropId);
+            if (!crop) return;
+
+            noCropSelected.classList.add('hidden');
+            cropDetailArea.classList.remove('hidden');
+
+            detailCategory.textContent = crop.category || '野菜';
+            detailName.textContent = crop.name;
+            detailVariety.textContent = crop.variety ? `品種: ${crop.variety}` : '品種未記載';
+            detailPlantDate.textContent = crop.plantDate;
+            detailDaysPassed.textContent = `${calculateDaysPassed(crop.plantDate)} 日目`;
+            detailNotes.textContent = crop.notes || '-';
+        }
+
+        // Render Logs Timeline
+        function renderLogs() {
+            logList.innerHTML = '';
+            if (logs.length === 0) {
+                emptyLogs.classList.remove('hidden');
+                return;
+            }
+            emptyLogs.classList.add('hidden');
+
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'border-l-2 border-brand-500 pl-4 py-1 space-y-2 relative';
+
+                const actionsHtml = log.actions && log.actions.length > 0 
+                    ? `<div class="flex flex-wrap gap-1 mt-1">
+                        ${log.actions.map(a => `<span class="bg-slate-100 text-slate-600 text-[11px] font-medium px-2 py-0.5 rounded">${escapeHtml(a)}</span>`).join('')}
+                      </div>` 
+                    : '';
+
+                const imageHtml = log.imageUrl 
+                    ? `<div class="mt-2"><img src="${escapeHtml(log.imageUrl)}" alt="観察写真" class="max-h-48 rounded-xl object-cover border border-slate-200"></div>` 
+                    : '';
+
+                item.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-bold text-slate-900"><i class="fa-regular fa-calendar-check text-brand-600 mr-1.5"></i>${log.date}</span>
+                        <button class="delete-log-btn text-xs text-slate-400 hover:text-red-500 p-1" data-id="${log.id}">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                    <div class="flex space-x-4 text-xs text-slate-600">
+                        ${log.height ? `<span>草丈: <strong class="text-slate-800">${log.height} cm</strong></span>` : ''}
+                        ${log.leaves ? `<span>葉の数: <strong class="text-slate-800">${log.leaves} 枚</strong></span>` : ''}
+                    </div>
+                    ${actionsHtml}
+                    ${log.notes ? `<p class="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">${escapeHtml(log.notes)}</p>` : ''}
+                    ${imageHtml}
+                `;
+
+                // Add delete event
+                item.querySelector('.delete-log-btn').onclick = () => deleteLog(log.id);
+
+                logList.appendChild(item);
+            });
+        }
+
+        // Render Growth Chart
+        function updateChart() {
+            const ctx = document.getElementById('growthChart').getContext('2d');
+
+            // Sort logs chronological for chart
+            const sortedLogs = [...logs].reverse();
+            const labels = sortedLogs.map(l => l.date);
+            const heights = sortedLogs.map(l => l.height || null);
+            const leaves = sortedLogs.map(l => l.leaves || null);
+
+            if (growthChartInstance) {
+                growthChartInstance.destroy();
+            }
+
+            growthChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '草丈 (cm)',
+                            data: heights,
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: '葉の数 (枚)',
+                            data: leaves,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [4, 4],
+                            tension: 0.2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: '草丈 (cm)', font: { size: 10 } },
+                            min: 0
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: '葉の数 (枚)', font: { size: 10 } },
+                            grid: { drawOnChartArea: false },
+                            min: 0
+                        }
+                    }
+                }
+            });
+        }
+
+        // Add Crop Modal Actions
+        openAddCropModalBtn.addEventListener('click', () => {
+            cropForm.reset();
+            document.getElementById('cropPlantDate').valueAsDate = new Date();
+            cropModal.classList.remove('hidden');
+        });
+
+        const closeCropModal = () => cropModal.classList.add('hidden');
+        closeCropModalBtn.addEventListener('click', closeCropModal);
+        cancelCropModalBtn.addEventListener('click', closeCropModal);
+
+        cropForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const name = document.getElementById('cropName').value.trim();
+            const variety = document.getElementById('cropVariety').value.trim();
+            const category = document.getElementById('cropCategory').value;
+            const plantDate = document.getElementById('cropPlantDate').value;
+            const notes = document.getElementById('cropNotes').value.trim();
+
+            try {
+                const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'crops'), {
+                    name,
+                    variety,
+                    category,
+                    plantDate,
+                    notes,
+                    createdAt: serverTimestamp()
+                });
+
+                closeCropModal();
+                selectCrop(docRef.id);
+                showToast('作物を追加しました', 'success');
+            } catch (error) {
+                console.error("Error adding crop:", error);
+                showToast('作物の追加に失敗しました', 'error');
+            }
+        });
+
+        // Add Log Modal Actions
+        openAddLogModalBtn.addEventListener('click', () => {
+            logForm.reset();
+            document.getElementById('logDate').valueAsDate = new Date();
+            logModal.classList.remove('hidden');
+        });
+
+        const closeLogModal = () => logModal.classList.add('hidden');
+        closeLogModalBtn.addEventListener('click', closeLogModal);
+        cancelLogModalBtn.addEventListener('click', closeLogModal);
+
+        logForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser || !selectedCropId) return;
+
+            const date = document.getElementById('logDate').value;
+            const height = document.getElementById('logHeight').value ? parseFloat(document.getElementById('logHeight').value) : null;
+            const leaves = document.getElementById('logLeaves').value ? parseInt(document.getElementById('logLeaves').value) : null;
+            const imageUrl = document.getElementById('logImageUrl').value.trim();
+            const notes = document.getElementById('logNotes').value.trim();
+
+            const actionCheckboxes = document.querySelectorAll('input[name="logAction"]:checked');
+            const actions = Array.from(actionCheckboxes).map(cb => cb.value);
+
+            try {
+                await addDoc(collection(db, 'users', currentUser.uid, 'crops', selectedCropId, 'logs'), {
+                    date,
+                    height,
+                    leaves,
+                    imageUrl,
+                    actions,
+                    notes,
+                    createdAt: serverTimestamp()
+                });
+
+                closeLogModal();
+                showToast('観察記録を追加しました', 'success');
+            } catch (error) {
+                console.error("Error adding log:", error);
+                showToast('記録の追加に失敗しました', 'error');
+            }
+        });
+
+        // Delete Crop
+        deleteCropBtn.addEventListener('click', async () => {
+            if (!selectedCropId || !currentUser) return;
+            if (!confirm('この作物と関連するすべての観察記録を削除しますか？')) return;
+
+            try {
+                await deleteDoc(doc(db, 'users', currentUser.uid, 'crops', selectedCropId));
+                selectedCropId = null;
+                showToast('作物を削除しました', 'info');
+            } catch (error) {
+                console.error("Error deleting crop:", error);
+                showToast('削除に失敗しました', 'error');
+            }
+        });
+
+        // Delete Log
+        async function deleteLog(logId) {
+            if (!currentUser || !selectedCropId || !logId) return;
+            if (!confirm('この観察記録を削除しますか？')) return;
+
+            try {
+                await deleteDoc(doc(db, 'users', currentUser.uid, 'crops', selectedCropId, 'logs', logId));
+                showToast('観察記録を削除しました', 'info');
+            } catch (error) {
+                console.error("Error deleting log:", error);
+                showToast('削除に失敗しました', 'error');
+            }
+        }
+
+        // Utility Functions
+        function calculateDaysPassed(plantDateStr) {
+            if (!plantDateStr) return 0;
+            const plantDate = new Date(plantDateStr);
+            const today = new Date();
+            const diffTime = today - plantDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays >= 0 ? diffDays : 0;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[m];
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-800 text-white';
+            if (type === 'success') bgClass = 'bg-brand-600 text-white';
+            if (type === 'error') bgClass = 'bg-red-600 text-white';
+
+            toast.className = `${bgClass} px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition transform translate-y-2 opacity-0 pointer-events-auto flex items-center space-x-2`;
+            toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+
+            toastContainer.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            // Remove after 3s
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
