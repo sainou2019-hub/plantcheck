@@ -338,6 +338,37 @@
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
+    <!-- Modal: Unauthorized Domain Guidance -->
+    <div id="domainErrorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div class="flex items-center space-x-3 text-amber-600">
+                <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                <h3 class="text-lg font-bold text-slate-900">Firebase ドメイン許可が必要です</h3>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                GitHub Pages（<span id="currentDomainName" class="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">sainou2019-hub.github.io</span>）からのGoogleログインを許可するために、Firebase Consoleでのドメイン追加設定が必要です。
+            </p>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+                <p class="font-semibold text-slate-700">【設定手順 (1分で完了)】</p>
+                <ol class="list-decimal list-inside space-y-1 text-slate-600">
+                    <li><a href="https://console.firebase.google.com/" target="_blank" class="text-brand-600 underline font-medium">Firebase Console</a> を開く</li>
+                    <li><strong>Authentication</strong> &gt; <strong>設定 (Settings)</strong> &gt; <strong>承認済みドメイン</strong> を開く</li>
+                    <li>「ドメインの追加」に以下の文字列を貼り付けて保存:</li>
+                </ol>
+                <div class="flex items-center space-x-2 bg-white p-2 rounded-lg border border-slate-300 mt-2">
+                    <code id="domainToCopy" class="text-xs font-mono flex-1 text-slate-800 font-bold">sainou2019-hub.github.io</code>
+                    <button id="copyDomainBtn" class="bg-slate-800 hover:bg-slate-700 text-white text-[11px] px-3 py-1.5 rounded-lg transition flex items-center space-x-1">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>コピー</span>
+                    </button>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end">
+                <button id="closeDomainModalBtn" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK Imports & Application Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -345,6 +376,8 @@
             getAuth, 
             GoogleAuthProvider, 
             signInWithPopup, 
+            signInWithRedirect,
+            getRedirectResult,
             signOut, 
             onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -452,16 +485,80 @@
             }
         });
 
-        // Auth Event Handlers
+        // Check redirect login result on page reload
+        getRedirectResult(auth).then((result) => {
+            if (result && result.user) {
+                showToast('ログインしました', 'success');
+            }
+        }).catch((error) => {
+            console.error("Redirect Result Error:", error);
+            if (error.code === 'auth/unauthorized-domain' || error.message?.includes('unauthorized-domain')) {
+                showDomainErrorModal();
+            }
+        });
+
+        // Auth Event Handlers (with Popup to Redirect fallback)
         const handleLogin = async () => {
             try {
+                // Try Popup login
                 await signInWithPopup(auth, googleProvider);
                 showToast('ログインしました', 'success');
             } catch (error) {
                 console.error("Login Error:", error);
-                showToast('ログインに失敗しました', 'error');
+                
+                // If domain error, show domain setup modal
+                if (error.code === 'auth/unauthorized-domain' || error.message?.includes('unauthorized-domain')) {
+                    showDomainErrorModal();
+                    return;
+                }
+                
+                // If popup was blocked or COOP error occurred, fallback to Redirect method
+                if (
+                    error.code === 'auth/popup-blocked' || 
+                    error.code === 'auth/popup-closed-by-user' ||
+                    error.code === 'auth/cancelled-popup-request' ||
+                    error.message?.includes('Cross-Origin-Opener-Policy') ||
+                    error.message?.includes('closed')
+                ) {
+                    console.log("Popup blocked/failed. Switching to Redirect login...");
+                    try {
+                        await signInWithRedirect(auth, googleProvider);
+                    } catch (redirectError) {
+                        console.error("Redirect Login Error:", redirectError);
+                        showToast('ログイン処理の開始に失敗しました', 'error');
+                    }
+                } else {
+                    showToast('ログインに失敗しました: ' + error.message, 'error');
+                }
             }
         };
+
+        function showDomainErrorModal() {
+            const modal = document.getElementById('domainErrorModal');
+            const currentDomain = window.location.hostname || 'sainou2019-hub.github.io';
+            document.getElementById('currentDomainName').textContent = currentDomain;
+            document.getElementById('domainToCopy').textContent = currentDomain;
+            modal.classList.remove('hidden');
+        }
+
+        document.getElementById('closeDomainModalBtn')?.addEventListener('click', () => {
+            document.getElementById('domainErrorModal').classList.add('hidden');
+        });
+
+        document.getElementById('copyDomainBtn')?.addEventListener('click', () => {
+            const domainText = document.getElementById('domainToCopy').textContent;
+            try {
+                const input = document.createElement('input');
+                input.value = domainText;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('ドメイン名をコピーしました', 'success');
+            } catch (err) {
+                showToast('コピーに失敗しました', 'error');
+            }
+        });
 
         googleLoginBtn.addEventListener('click', handleLogin);
         heroLoginBtn.addEventListener('click', handleLogin);
